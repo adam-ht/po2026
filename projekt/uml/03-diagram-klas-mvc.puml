@@ -1,0 +1,163 @@
+@startuml
+title Symulator śluzy wodnej – architektura MVC (pakiety i zależności)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+hide empty members
+
+' Zasada MVC: warstwę prezentacji można wymienić bez zmian modelu.
+' Strzałki zależności idą tylko w stronę modelu: view i controller znają model,
+' model nie zna ich (zdarzenia dostarcza przez interfejs LockListener).
+' Pełny model klas: 03-diagram-klas.puml (tu tylko klasy graniczne).
+
+package "model" {
+    package "model.sim" {
+        class Simulation {
+            +step()
+            +addShip(type: ShipType, direction: Direction)
+            +emergencyStop()
+            +resumeAfterEmergency(): boolean
+            +createSnapshot(): SimulationSnapshot
+            +addListener(listener: LockListener)
+            +getStatistics(): Statistics
+        }
+        class SimulationSnapshot
+        class Statistics
+    }
+    package "model.lock" {
+        interface LockListener
+    }
+}
+
+package "view" {
+    interface SimulationView {
+        +render(snapshot: SimulationSnapshot)
+        +showMessage(text: String)
+    }
+
+    class ConsoleView {
+        -output: PrintStream
+    }
+
+    note bottom of ConsoleView
+      Interfejs z linii komend (GUI nie jest obowiązkowe).
+      Inny widok (np. JavaFX) = kolejna implementacja
+      SimulationView, bez zmian w modelu.
+    end note
+}
+
+package "controller" {
+    class SimulationController {
+        -simulation: Simulation
+        -view: SimulationView
+        -runner: SimulationRunner
+        -commandFactory: CommandFactory
+        +start()
+        +processInput(line: String)
+        +getSimulation(): Simulation
+        +getView(): SimulationView
+        +getRunner(): SimulationRunner
+    }
+
+    class SimulationRunner {
+        -simulation: Simulation
+        -view: SimulationView
+        -tickMillis: long
+        -paused: boolean
+        -running: boolean
+        +run()
+        +setPaused(paused: boolean)
+        +isPaused(): boolean
+        +stop()
+    }
+
+    note bottom of SimulationRunner
+      Wątek symulacji (Runnable): co tickMillis wywołuje
+      simulation.step() i view.render(snapshot).
+      paused / running są volatile; stan modelu chroni
+      synchronized w klasie Simulation.
+      Wątek główny czyta polecenia z konsoli.
+    end note
+
+    interface Command {
+        +execute(controller: SimulationController): String
+    }
+
+    class CommandFactory {
+        +create(line: String): Optional<Command>
+    }
+
+    class AddShipCommand {
+        -type: ShipType
+        -direction: Direction
+    }
+    class EmergencyStopCommand
+    class ResumeCommand
+    class PauseCommand
+    class ShowStatsCommand
+    class SaveCommand {
+        -path: Path
+    }
+
+    note bottom of CommandFactory
+      Wzorce Factory + Command: wiersz z konsoli
+      ("add up cargo", "halt", "save stan.dat")
+      zamieniany jest na obiekt polecenia.
+    end note
+}
+
+package "storage" {
+    class SimulationStorage {
+        +save(simulation: Simulation, path: Path)
+        +load(path: Path): Simulation
+    }
+
+    note bottom of SimulationStorage
+      Zapis i odczyt stanu: ObjectOutputStream /
+      ObjectInputStream. save() blokuje simulation
+      (synchronized), żeby nie zapisać połowy taktu.
+    end note
+}
+
+package "app" {
+    class Main {
+        +{static} main(args: String[])
+    }
+}
+
+interface Runnable <<java.lang>>
+
+' --- widok ---
+SimulationView --|> LockListener
+ConsoleView ..|> SimulationView
+SimulationView ..> SimulationSnapshot
+
+' --- kontroler ---
+SimulationController "1" *-- "1" SimulationRunner
+SimulationController "1" *-- "1" CommandFactory
+SimulationController --> "1" Simulation
+SimulationController --> "1" SimulationView
+SimulationRunner ..|> Runnable
+SimulationRunner --> Simulation
+SimulationRunner --> SimulationView
+CommandFactory ..> Command : <<create>>
+Command <|.. AddShipCommand
+Command <|.. EmergencyStopCommand
+Command <|.. ResumeCommand
+Command <|.. PauseCommand
+Command <|.. ShowStatsCommand
+Command <|.. SaveCommand
+Command ..> SimulationController
+SaveCommand ..> SimulationStorage
+
+' --- model, storage, app ---
+Simulation ..> SimulationSnapshot : <<create>>
+Simulation "1" *-- "1" Statistics
+Statistics ..|> LockListener
+SimulationStorage ..> Simulation
+Main ..> SimulationStorage
+Main ..> SimulationController
+Main ..> ConsoleView
+
+@enduml

@@ -1,0 +1,60 @@
+@startuml
+title Sekwencja: zapis stanu symulacji i wczytanie przy starcie
+' Przypadki użycia: "Zapisać stan symulacji", "Wczytać stan symulacji"
+' Wejście/wyjście: ObjectOutputStream / ObjectInputStream (serializacja grafu obiektów).
+
+skinparam shadowing false
+autonumber
+
+actor "Operator" as Operator
+participant "main : Main" as Main
+participant "controller : SimulationController" as Controller
+participant "command : SaveCommand" as Command
+participant "storage : SimulationStorage" as Storage
+participant "simulation : Simulation" as Simulation
+participant "view : SimulationView" as View
+participant "runner : SimulationRunner" as Runner
+
+== Zapis (wątek konsoli) ==
+
+Operator -> Controller : processInput("save stan.dat")
+activate Controller
+Controller -> Command : execute(controller)
+activate Command
+Command -> Storage : save(simulation, path)
+activate Storage
+Storage -> Storage : new ObjectOutputStream(new FileOutputStream(path))
+Storage -> Simulation : synchronized(simulation) { writeObject(simulation) }
+note right of Simulation : zapisywany jest cały graf obiektów\n(Lock, Gate, Chamber, kolejki, statki, Statistics);\nlisteners w Lock są transient
+Storage --> Command : ok
+deactivate Storage
+Command --> Controller : "Zapisano stan do stan.dat"
+deactivate Command
+Controller -> View : showMessage(text)
+deactivate Controller
+
+== Wczytanie przy starcie programu ==
+
+Operator -> Main : uruchomienie z argumentem stan.dat
+activate Main
+Main -> Storage : load(path)
+activate Storage
+Storage -> Storage : new ObjectInputStream(new FileInputStream(path))
+Storage -> Simulation ** : readObject()
+Simulation -> Simulation : readObject(): ponownie zarejestruj Statistics jako listener
+Storage --> Main : simulation
+deactivate Storage
+
+Main -> Controller ** : new SimulationController(simulation, view)
+Controller -> Simulation : addListener(view)
+Main -> Controller : start()
+Controller -> Runner ** : new SimulationRunner(simulation, view, tickMillis)
+Controller -> Runner : new Thread(runner).start()
+deactivate Main
+
+note over Storage
+  Błędy I/O (IOException, ClassNotFoundException) są łapane w kontrolerze
+  i pokazywane widokowi jako komunikat – symulacja działa dalej.
+end note
+
+@enduml

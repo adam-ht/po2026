@@ -1,0 +1,30 @@
+@startuml
+title Diagram stanów: brama śluzy (GateState)
+
+skinparam shadowing false
+hide empty description
+
+[*] --> CLOSED
+
+CLOSED --> OPENING : startOpening()\n[SafetyRules.canOpenGate(side, state)]
+OPENING --> OPEN : advance() [ticksLeft == 0]
+OPEN --> CLOSING : startClosing()
+CLOSING --> CLOSED : advance() [ticksLeft == 0]
+
+note right of OPENING
+  Czas otwierania i zamykania = gateTicks taktów.
+  Podczas OPENING / CLOSING / OPEN poziom wody
+  w komorze nie może się zmieniać (reguły R2 i R3).
+end note
+
+note bottom of CLOSED
+  Reguły bezpieczeństwa (interfejs SafetyRule, klasa SafetyRules):
+  R1 SingleOpenGateRule: obie bramy nigdy jednocześnie w stanie innym niż CLOSED
+  R2 LevelMatchesOpenGateRule: brama inna niż CLOSED tylko przy równym poziomie wody
+  R4 ChamberCapacityRule: suma długości statków w komorze ≤ capacity
+  (R1, R2, R4 sprawdza SafetyRules.verify(state) po każdym takcie)
+  R3: poziom wody zmienia się tylko przy obu bramach CLOSED
+  (R3 to warunek przejścia – pilnuje go SafetyRules.canChangeLevel(state))
+end note
+
+@enduml

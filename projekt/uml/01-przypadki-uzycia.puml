@@ -1,38 +1,99 @@
 @startuml
+title Symulator śluzy wodnej – diagram przypadków użycia
+
 left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
 
-' TODO: zastąpcie "Użytkownik" właściwą nazwą aktora (np. Klient, Pracownik,
-' Administrator...) i dodajcie kolejnych aktorów, jeśli ich macie więcej.
-actor "Użytkownik" as User
+' Aktorzy: Operator i Kapitan to ludzie (w symulacji ich działania są
+' odgrywane przez program), Zegar symulacji to aktor systemowy.
+actor "Operator" as Op
+actor "Kapitan statku" as Cap
+actor "Zegar symulacji" as Clock <<system>>
 
-package "Nazwa waszej aplikacji" {
+rectangle "Symulator śluzy wodnej" {
 
-    ' TODO: to są tylko przykładowe, generyczne przypadki użycia.
-    ' Zastąpcie je / dopiszcie własne, dopasowane do waszego tematu projektu.
-    usecase "Zaloguj się" as UC_Login
-    usecase "Przeglądaj dane" as UC_Browse
-    usecase "Dodaj nowy element" as UC_Add
-    usecase "Edytuj istniejący element" as UC_Edit
-    usecase "Usuń element" as UC_Delete
+    package "Sterowanie symulacją" {
+        usecase "Skonfigurować symulację" as UC_Config
+        usecase "Uruchomić symulację" as UC_Start
+        usecase "Wstrzymać / wznowić symulację" as UC_Pause
+        usecase "Zatrzymać awaryjnie" as UC_Halt
+        usecase "Wznowić po awarii" as UC_Resume
+        usecase "Zapisać stan symulacji" as UC_Save
+        usecase "Wczytać stan symulacji" as UC_Load
+    }
 
-    User --> UC_Login
-    User --> UC_Browse
-    User --> UC_Add
-    User --> UC_Edit
-    User --> UC_Delete
+    package "Obserwacja" {
+        usecase "Podejrzeć stan śluzy" as UC_View
+        usecase "Zobaczyć statystyki" as UC_Stats
+    }
 
-    ' Przykład relacji <<include>> — UC_Add zawsze wymaga bycia zalogowanym.
-    UC_Add .> UC_Login : <<include>>
-    UC_Edit .> UC_Login : <<include>>
-    UC_Delete .> UC_Login : <<include>>
+    package "Ruch statków" {
+        usecase "Zgłosić przybycie do śluzy" as UC_Arrive
+        usecase "Dodać statek ręcznie" as UC_AddManual
+        usecase "Przepłynąć przez śluzę" as UC_Pass
+        usecase "Oczekiwać w kolejce" as UC_Wait
+        usecase "Wpłynąć do komory" as UC_Board
+        usecase "Opuścić komorę" as UC_Exit
+    }
+
+    package "Praca śluzy (automatyczna)" {
+        usecase "Wykonać krok symulacji" as UC_Step
+        usecase "Wygenerować nowe statki" as UC_Generate
+        usecase "Przesunąć fazę pracy śluzy" as UC_Phase
+        usecase "Sprawdzić reguły bezpieczeństwa" as UC_Safety
+    }
 }
 
-' Wskazówki:
-' - left to right direction układa aktorów po lewej, przypadki po prawej
-'   (czytelniejsze przy więcej niż 1 aktorze).
-' - <<include>> = przypadek ZAWSZE wywołuje inny jako swoją część.
-' - <<extend>> = przypadek OPCJONALNIE rozszerza inny, tylko w pewnych warunkach.
-' - Grupujcie powiązane przypadki użycia w podpakiety (package "Nazwa grupy" { ... }),
-'   jeśli macie ich więcej niż 5-6 — tak jak w materiale z zajęć (system biblioteczny).
+' --- Operator ---
+Op --> UC_Config
+Op --> UC_Start
+Op --> UC_Pause
+Op --> UC_Halt
+Op --> UC_Resume
+Op --> UC_Save
+Op --> UC_Load
+Op --> UC_View
+Op --> UC_Stats
+Op --> UC_AddManual
+
+' --- Kapitan statku ---
+Cap --> UC_Arrive
+Cap --> UC_Pass
+
+' --- Zegar symulacji ---
+Clock --> UC_Step
+
+' --- Relacje między przypadkami użycia ---
+' Ręczne dodanie statku kończy się tak samo jak zgłoszenie przez kapitana.
+UC_AddManual .> UC_Arrive : <<include>>
+
+' Przepłynięcie to zawsze: kolejka -> wpłynięcie -> opuszczenie komory.
+' (zmianę poziomu wody i obsługę bram wykonuje śluza, nie kapitan)
+UC_Pass .> UC_Wait : <<include>>
+UC_Pass .> UC_Board : <<include>>
+UC_Pass .> UC_Exit : <<include>>
+
+' Każdy krok symulacji to: nowe statki, ruch fazy śluzy, kontrola reguł.
+UC_Step .> UC_Generate : <<include>>
+UC_Step .> UC_Phase : <<include>>
+UC_Step .> UC_Safety : <<include>>
+
+' Awaryjne zatrzymanie zachodzi tylko wtedy, gdy operator je zażąda
+' albo kontrola reguł wykryje naruszenie – stąd <<extend>>.
+UC_Halt .> UC_Safety : <<extend>>
+' "Wznowić po awarii" jest osobnym przypadkiem – warunek wstępny:
+' śluza jest w stanie HALTED (nie jest to rozszerzenie żadnego innego).
+
+' Mapowanie na diagramy sekwencji (jeden plik na przypadek użycia):
+'   Zgłosić przybycie do śluzy   -> 02-sekwencja-przybycie-statku.puml
+'   Wykonać krok symulacji       -> 02-sekwencja-krok-symulacji.puml
+'   Przepłynąć przez śluzę       -> 02-sekwencja-przeplyniecie-statku.puml
+'   Zatrzymać awaryjnie / wznowić -> 02-sekwencja-awaryjne-zatrzymanie.puml
+'   Zapisać / wczytać stan        -> 02-sekwencja-zapis-i-odczyt-stanu.puml
+' Pozostałe przypadki (konfiguracja, podgląd, statystyki) są proste
+' i nie mają własnych diagramów sekwencji.
+' Operator wydaje polecenia w konsoli (CLI zamiast GUI); "Wczytać stan"
+' odbywa się przy starcie programu (argument wiersza poleceń).
 
 @enduml

@@ -1,0 +1,83 @@
+@startuml
+title Sekwencja: jeden krok symulacji (wątek symulacji)
+' Przypadek użycia: "Wykonać krok symulacji"
+
+skinparam shadowing false
+autonumber
+
+actor "Zegar symulacji" as Clock
+participant "runner : SimulationRunner" as Runner
+participant "simulation : Simulation" as Simulation
+participant "lock : Lock" as Lock
+participant "lowerGate / upperGate : Gate" as Gate
+participant "phase : LockPhase" as Phase
+participant "rules : SafetyRules" as Rules
+participant "listener : LockListener" as Listener
+participant "statistics : Statistics" as Statistics
+participant "view : SimulationView" as View
+
+Clock -> Runner : upłynęło tickMillis
+activate Runner
+alt paused == true
+    Runner -> Runner : pomiń krok
+else symulacja działa
+    Runner -> Simulation : step()
+    activate Simulation
+    Simulation -> Simulation : currentTick++
+
+    ref over Simulation, Lock
+      Generowanie i zgłaszanie nowych statków
+      (02-sekwencja-przybycie-statku.puml)
+    end ref
+
+    Simulation -> Lock : advance(currentTick)
+    activate Lock
+
+    alt phase == HALTED
+        note over Lock : śluza zatrzymana – bramy i poziom wody\nnie zmieniają się do wywołania resume()
+    else praca normalna
+        Lock -> Gate : advance()
+        note right : bramy w stanie OPENING / CLOSING\nzmniejszają ticksLeft
+
+        Lock -> Phase : update(lock, currentTick)
+        activate Phase
+        Phase --> Lock : nextPhase
+        deactivate Phase
+
+        opt nextPhase != phase
+            Lock -> Lock : changePhase(nextPhase, currentTick)
+            Lock -> Phase : nextPhase.onEnter(lock, currentTick)
+            Lock -> Listener : onPhaseChanged(from, to, currentTick)
+        end
+
+        Lock -> Rules : verify(lock)
+        activate Rules
+
+        alt wszystkie niezmienniki spełnione
+            Rules --> Lock : (brak wyjątku)
+        else naruszenie reguły
+            Rules --> Lock : SafetyViolationException
+            deactivate Rules
+            Lock -> Lock : halt(exception.getRuleId(), currentTick)
+            note right : szczegóły:\n02-sekwencja-awaryjne-zatrzymanie.puml
+        end
+    end
+    deactivate Lock
+
+    Simulation -> Statistics : sample(lock)
+    deactivate Simulation
+
+    Runner -> Simulation : createSnapshot()
+    Simulation --> Runner : snapshot
+    Runner -> View : render(snapshot)
+end
+
+Runner -> Runner : sleep(tickMillis)
+deactivate Runner
+
+note over Simulation
+  step() i createSnapshot() są synchronized – polecenia operatora
+  z wątku konsoli nie wejdą w środek taktu.
+end note
+
+@enduml

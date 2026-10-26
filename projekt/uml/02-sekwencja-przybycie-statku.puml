@@ -1,0 +1,74 @@
+@startuml
+title Sekwencja: zgłoszenie przybycia statku do śluzy
+' Przypadek użycia: "Zgłosić przybycie do śluzy" (+ "Dodać statek ręcznie")
+
+skinparam shadowing false
+autonumber
+
+participant "runner : SimulationRunner" as Runner
+actor "Operator" as Operator
+participant "controller : SimulationController" as Controller
+participant "commandFactory : CommandFactory" as CommandFactory
+participant "command : AddShipCommand" as Command
+participant "simulation : Simulation" as Simulation
+participant "generator : ArrivalGenerator" as Generator
+participant "shipFactory : ShipFactory" as ShipFactory
+participant "ship : Ship" as Ship
+participant "lock : Lock" as Lock
+participant "queue : ShipQueue" as Queue
+participant "listener : LockListener" as Listener
+participant "view : SimulationView" as View
+
+== Statek wygenerowany przez symulację (wątek symulacji) ==
+
+Runner -> Simulation : step()
+activate Simulation
+Simulation -> Generator : generate(currentTick)
+activate Generator
+
+loop dla kierunku UP i DOWN
+    alt losowanie < arrivalProbability
+        Generator -> Generator : pickRandomType()
+        Generator -> ShipFactory : create(type, direction, currentTick)
+        ShipFactory -> Ship ** : new (id, direction, currentTick)
+        ShipFactory --> Generator : ship
+    end
+end
+
+Generator --> Simulation : List<Ship> newShips
+deactivate Generator
+
+loop dla każdego statku z newShips
+    Simulation -> Lock : registerArrival(ship, currentTick)
+    activate Lock
+    Lock -> Ship : getDirection()
+    Ship --> Lock : direction
+    Lock -> Queue : enqueue(ship)
+    Lock -> Listener : onShipArrived(ship, currentTick)
+    note right of Listener : Statistics zlicza przybycie,\nwidok wypisuje zdarzenie
+    deactivate Lock
+end
+deactivate Simulation
+
+== Statek dodany ręcznie przez operatora (wątek konsoli) ==
+
+Operator -> Controller : processInput("add up cargo")
+activate Controller
+Controller -> CommandFactory : create(line)
+CommandFactory --> Controller : Optional(AddShipCommand)
+Controller -> Command : execute(controller)
+activate Command
+Command -> Simulation : addShip(CARGO_SHIP, UP)
+activate Simulation
+Simulation -> ShipFactory : create(type, direction, currentTick)
+ShipFactory --> Simulation : ship
+Simulation -> Lock : registerArrival(ship, currentTick)
+Lock -> Queue : enqueue(ship)
+Lock -> Listener : onShipArrived(ship, currentTick)
+deactivate Simulation
+Command --> Controller : "Dodano statek #n"
+deactivate Command
+Controller -> View : showMessage(text)
+deactivate Controller
+
+@enduml
