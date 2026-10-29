@@ -1,0 +1,410 @@
+@startuml
+title Symulator śluzy wodnej – diagram klas modelu (pakiet model)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+hide empty members
+
+' Konwencja: klasy UpperCamelCase, pakiety / zmienne / metody małymi literami
+' (camelCase), nazwy znaczące. Identyfikatory po angielsku, opisy po polsku.
+' Wszystkie atrybuty są private – gettery pominięte, gdy nie wnoszą informacji.
+' Czas liczymy w dyskretnych taktach (currentTick) – symulacja jest powtarzalna.
+' Model nie zna widoku ani kontrolera (zob. 03-diagram-klas-mvc.puml).
+
+package "model.ship" {
+    enum Direction {
+        UP
+        DOWN
+        +getOpposite(): Direction
+    }
+
+    enum ShipType {
+        PASSENGER_BOAT
+        CARGO_SHIP
+        BARGE
+    }
+
+    interface Ship {
+        +getId(): int
+        +getType(): ShipType
+        +getDirection(): Direction
+        +getArrivalTick(): int
+        +getLength(): int
+        +getBoardingTicks(): int
+        +getBasePriority(): int
+        +getEffectivePriority(currentTick: int, agingStep: int): int
+        +getWaitingTime(): int
+        +getDescription(): String
+        +markBoarded(currentTick: int)
+        +markExited(currentTick: int)
+    }
+
+    abstract class AbstractShip {
+        -id: int
+        -direction: Direction
+        -arrivalTick: int
+        -boardedTick: Integer
+        -exitedTick: Integer
+        ~AbstractShip(id: int, direction: Direction, arrivalTick: int)
+        +{abstract} getType(): ShipType
+        +{abstract} getLength(): int
+        +{abstract} getBoardingTicks(): int
+        +{abstract} getBasePriority(): int
+        +getEffectivePriority(currentTick: int, agingStep: int): int
+        +getWaitingTime(): int
+        +getDescription(): String
+        +markBoarded(currentTick: int)
+        +markExited(currentTick: int)
+    }
+
+    class PassengerBoat
+    class CargoShip
+    class Barge
+
+    class ShipFactory {
+        -nextId: int
+        +create(type: ShipType, direction: Direction, currentTick: int): Ship
+    }
+
+    class ShipQueue {
+        -direction: Direction
+        -waitingShips: List<Ship>
+        -agingStep: int
+        +enqueue(ship: Ship)
+        +pollBestFitting(maxLength: int, currentTick: int): Optional<Ship>
+        +getSize(): int
+        +isEmpty(): boolean
+        +getDescriptions(): List<String>
+    }
+
+    note right of AbstractShip
+      getEffectivePriority = getBasePriority + (currentTick - arrivalTick) / agingStep
+      Metoda szablonowa (Template Method): korzysta z getBasePriority() podklas.
+      Starzenie zapobiega głodzeniu statków o niskim priorytecie.
+    end note
+
+    note bottom of ShipFactory
+      Wzorzec Factory: konstruktory statków są pakietowe,
+      więc statek można utworzyć tylko przez fabrykę
+      (ona też nadaje unikalne id).
+    end note
+
+    note bottom of PassengerBoat
+      np. getLength 1, getBoardingTicks 1, priorytet 3
+    end note
+    note bottom of CargoShip
+      np. getLength 3, getBoardingTicks 3, priorytet 2
+    end note
+    note bottom of Barge
+      np. getLength 4, getBoardingTicks 4, priorytet 1
+    end note
+
+    note bottom of ShipQueue
+      Lista (ArrayList) + wybór maksimum zamiast PriorityQueue:
+      priorytet zależy od czasu (starzenie), więc kolejność
+      zmienia się w trakcie czekania i kopiec by się psuł.
+    end note
+}
+
+package "model.lock" {
+    enum GateSide {
+        LOWER
+        UPPER
+    }
+
+    enum GateState {
+        CLOSED
+        OPENING
+        OPEN
+        CLOSING
+    }
+
+    class Gate {
+        -side: GateSide
+        -state: GateState
+        -ticksLeft: int
+        -gateTicks: int
+        +startOpening()
+        +startClosing()
+        +advance()
+        +isOpen(): boolean
+        +isClosed(): boolean
+        +getSide(): GateSide
+        +getState(): GateState
+    }
+
+    class Chamber {
+        -waterLevel: double
+        -lowerLevel: double
+        -upperLevel: double
+        -levelRatePerTick: double
+        -capacity: int
+        -occupants: List<Ship>
+        +fillStep()
+        +drainStep()
+        +getLevelAt(side: GateSide): double
+        +isLevelWith(side: GateSide): boolean
+        +getRemainingCapacity(): int
+        +getUsedCapacity(): int
+        +add(ship: Ship)
+        +removeNext(): Ship
+        +isEmpty(): boolean
+        +getWaterLevel(): double
+        +getOccupantDescriptions(): List<String>
+    }
+
+    enum LockPhase {
+        WAITING
+        LEVELING_TO_ENTRY
+        OPENING_ENTRY_GATE
+        BOARDING
+        CLOSING_ENTRY_GATE
+        LEVELING_TO_EXIT
+        OPENING_EXIT_GATE
+        UNBOARDING
+        CLOSING_EXIT_GATE
+        HALTED
+        +onEnter(lock: Lock, currentTick: int)
+        +update(lock: Lock, currentTick: int): LockPhase
+    }
+
+    note right of LockPhase
+      Wzorzec State w enumie: każda stała nadpisuje update()
+      (zwraca następną fazę) i opcjonalnie onEnter()
+      (np. OPENING_ENTRY_GATE otwiera bramę wejściową).
+    end note
+
+    interface DirectionPolicy {
+        +choose(upQueue: ShipQueue, downQueue: ShipQueue, lastDirection: Direction, currentTick: int): Optional<Direction>
+    }
+
+    class AlternatingPolicy
+    class LongestQueuePolicy
+
+    note bottom of LongestQueuePolicy
+      Wzorzec Strategy: sposób wyboru kolejnego kierunku
+      można wymienić bez zmian w klasie Lock.
+    end note
+
+    interface LockListener {
+        +onShipArrived(ship: Ship, currentTick: int)
+        +onPhaseChanged(from: LockPhase, to: LockPhase, currentTick: int)
+        +onShipBoarded(ship: Ship, currentTick: int)
+        +onShipExited(ship: Ship, currentTick: int)
+        +onHalted(reason: String, currentTick: int)
+        +onResumed(phase: LockPhase, currentTick: int)
+    }
+
+    interface LockState {
+        +getPhase(): LockPhase
+        +getDirection(): Direction
+        +getGateState(side: GateSide): GateState
+        +getWaterLevel(): double
+        +getLevelAt(side: GateSide): double
+        +getUsedCapacity(): int
+        +getCapacity(): int
+    }
+
+    interface SafetyRule {
+        +getId(): String
+        +findViolation(state: LockState): Optional<String>
+    }
+
+    class SingleOpenGateRule
+    class LevelMatchesOpenGateRule
+    class ChamberCapacityRule
+
+    class SafetyRules {
+        -rules: List<SafetyRule>
+        +canOpenGate(side: GateSide, state: LockState): boolean
+        +canChangeLevel(state: LockState): boolean
+        +verify(state: LockState)
+    }
+
+    class SafetyViolationException {
+        -ruleId: String
+        +getRuleId(): String
+    }
+
+    class Lock {
+        -phase: LockPhase
+        -phaseBeforeHalt: LockPhase
+        -direction: Direction
+        -lowerGate: Gate
+        -upperGate: Gate
+        -chamber: Chamber
+        -queues: Map<Direction, ShipQueue>
+        -listeners: Set<LockListener>
+        -shipBeingBoarded: Ship
+        -boardingTicksLeft: int
+        -boardingWindowLeft: int
+        +registerArrival(ship: Ship, currentTick: int)
+        +advance(currentTick: int)
+        +halt(reason: String, currentTick: int)
+        +resume(currentTick: int): boolean
+        +addListener(listener: LockListener)
+        +getQueue(direction: Direction): ShipQueue
+        +getGate(side: GateSide): Gate
+        +getChamber(): Chamber
+        ~getEntryGate(): Gate
+        ~getExitGate(): Gate
+        ~chooseDirection(currentTick: int): boolean
+        ~openGate(gate: Gate)
+        ~closeGate(gate: Gate)
+        ~levelStep(target: GateSide): boolean
+        ~boardStep(currentTick: int): boolean
+        ~unboardStep(currentTick: int): boolean
+    }
+
+    note bottom of Lock
+      Operacje oznaczone tyldą są pakietowe – wywołuje je LockPhase.
+      levelStep / boardStep / unboardStep zwracają true,
+      gdy dana faza jest zakończona.
+      advance(currentTick): bramy advance() -> phase.update() ->
+      (zmiana fazy + onEnter) -> rules.verify(this);
+      SafetyViolationException powoduje halt().
+      Wzorzec Observer: listeners (Set) dostają zdarzenia.
+    end note
+}
+
+package "model.sim" {
+    class SimulationConfig {
+        -chamberCapacity: int
+        -lowerLevel: double
+        -upperLevel: double
+        -levelRatePerTick: double
+        -gateTicks: int
+        -boardingWindow: int
+        -agingStep: int
+        -arrivalProbability: double
+        -randomSeed: long
+        -policy: DirectionPolicy
+    }
+
+    note bottom of SimulationConfig
+      Obiekt niezmienny: pola private final,
+      getter do każdego pola. Walidacja w konstruktorze
+      (np. capacity >= długość największego statku).
+    end note
+
+    class ArrivalGenerator {
+        -random: Random
+        -arrivalProbability: double
+        -shipFactory: ShipFactory
+        +generate(currentTick: int): List<Ship>
+        -pickRandomType(): ShipType
+    }
+
+    class Statistics {
+        -servedCount: int
+        -totalWaitingTime: int
+        -maxWaitingTime: int
+        -cycleCount: int
+        -servedByType: Map<ShipType, Integer>
+        -maxQueueSize: Map<Direction, Integer>
+        +sample(lock: Lock)
+        +createReport(): String
+    }
+
+    class SimulationSnapshot {
+        -currentTick: int
+        -phase: LockPhase
+        -direction: Direction
+        -waterLevel: double
+        -lowerGateState: GateState
+        -upperGateState: GateState
+        -upQueue: List<String>
+        -downQueue: List<String>
+        -chamberContents: List<String>
+    }
+
+    note bottom of SimulationSnapshot
+      Niezmienna migawka stanu dla widoku:
+      widok nie dotyka obiektów modelu.
+    end note
+
+    class Simulation {
+        -currentTick: int
+        +step()
+        +addShip(type: ShipType, direction: Direction)
+        +emergencyStop()
+        +resumeAfterEmergency(): boolean
+        +createSnapshot(): SimulationSnapshot
+        +addListener(listener: LockListener)
+        +getStatistics(): Statistics
+        +getCurrentTick(): int
+    }
+
+    note right of Simulation
+      Fasada modelu. Metody publiczne są synchronized:
+      wątek symulacji i wątek konsoli
+      nie mogą jednocześnie zmieniać stanu.
+    end note
+}
+
+interface Serializable <<java.io>>
+
+' --- model.ship ---
+Ship <|.. AbstractShip
+AbstractShip <|-- PassengerBoat
+AbstractShip <|-- CargoShip
+AbstractShip <|-- Barge
+AbstractShip --> Direction
+Ship ..> ShipType
+ShipFactory ..> Ship : <<create>>
+ShipFactory ..> ShipType
+ShipQueue "1" o-- "0..*" Ship : waitingShips
+ShipQueue --> Direction
+
+' --- model.lock ---
+Gate --> GateSide
+Gate --> GateState
+Chamber "1" o-- "0..*" Ship : occupants
+Chamber ..> GateSide
+
+DirectionPolicy <|.. AlternatingPolicy
+DirectionPolicy <|.. LongestQueuePolicy
+DirectionPolicy ..> ShipQueue
+
+SafetyRule <|.. SingleOpenGateRule
+SafetyRule <|.. LevelMatchesOpenGateRule
+SafetyRule <|.. ChamberCapacityRule
+SafetyRule ..> LockState
+SafetyRules "1" o-- "1..*" SafetyRule : rules
+SafetyRules ..> LockState
+SafetyRules ..> SafetyViolationException : <<throws>>
+
+Lock ..|> LockState
+Lock "1" *-- "2" Gate
+Lock "1" *-- "1" Chamber
+Lock "1" *-- "2" ShipQueue : queues (UP, DOWN)
+Lock "1" *-- "1" SafetyRules
+Lock --> LockPhase
+Lock --> "1" DirectionPolicy
+Lock "1" o-- "0..*" LockListener : listeners
+Lock ..> Ship
+Lock ..> SafetyViolationException : <<catches>>
+LockPhase ..> Lock : <<uses>>
+
+' --- model.sim ---
+Simulation ..|> Serializable
+Simulation "1" *-- "1" Lock
+Simulation "1" *-- "1" ArrivalGenerator
+Simulation "1" *-- "1" ShipFactory
+Simulation "1" *-- "1" Statistics
+Simulation --> SimulationConfig
+Simulation ..> SimulationSnapshot : <<create>>
+ArrivalGenerator --> ShipFactory
+ArrivalGenerator ..> Ship
+Statistics ..|> LockListener
+Statistics ..> Lock
+
+note bottom of Serializable
+  Cały graf obiektów Simulation jest Serializable
+  (zapis ObjectOutputStream). Pole listeners w Lock
+  jest transient, Simulation po odczycie ponownie
+  rejestruje Statistics.
+end note
+
+@enduml

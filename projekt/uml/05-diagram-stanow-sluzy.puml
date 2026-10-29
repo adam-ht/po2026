@@ -1,0 +1,48 @@
+@startuml
+title Diagram stanów: faza pracy śluzy (LockPhase)
+
+skinparam shadowing false
+hide empty description
+
+' Jeden pełny cykl: WAITING -> ... -> CLOSING_EXIT_GATE -> WAITING.
+' Kierunek cyklu wybiera DirectionPolicy w fazie WAITING.
+' HALTED może zatrzymać śluzę w dowolnej fazie; po wznowieniu wracamy
+' do tej samej fazy (historia [H]), a nie na początek cyklu.
+
+[*] --> Praca
+
+state Praca {
+    [*] --> WAITING
+
+    WAITING --> LEVELING_TO_ENTRY : policy wybrała kierunek\n[poziom komory ≠ poziom bramy wejściowej]
+    WAITING --> OPENING_ENTRY_GATE : policy wybrała kierunek\n[poziom komory = poziom bramy wejściowej]
+
+    LEVELING_TO_ENTRY --> OPENING_ENTRY_GATE : [poziom wyrównany]
+    OPENING_ENTRY_GATE --> BOARDING : [brama wejściowa OPEN]
+
+    BOARDING --> CLOSING_ENTRY_GATE : [komora niepusta]\n[nic się nie mieści lub minął boardingWindow]
+    CLOSING_ENTRY_GATE --> LEVELING_TO_EXIT : [brama wejściowa CLOSED]
+
+    LEVELING_TO_EXIT --> OPENING_EXIT_GATE : [poziom równy poziomowi bramy wyjściowej]
+    OPENING_EXIT_GATE --> UNBOARDING : [brama wyjściowa OPEN]
+
+    UNBOARDING --> CLOSING_EXIT_GATE : [komora pusta]
+    CLOSING_EXIT_GATE --> WAITING : [brama wyjściowa CLOSED]
+}
+
+state HALTED
+
+Praca --> HALTED : halt(powód)\n(operator lub SafetyViolationException)
+HALTED --> Praca[H] : resume()\n[verify(lock) bez naruszeń]
+
+note right of WAITING
+  Brak statków w obu kolejkach –
+  śluza zostaje w WAITING.
+end note
+
+note left of BOARDING
+  boardStep(): po jednym statku naraz,
+  każdy wpływa boardingTicks() taktów.
+end note
+
+@enduml

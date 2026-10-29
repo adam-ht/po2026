@@ -1,0 +1,90 @@
+@startuml
+title Sekwencja: awaryjne zatrzymanie i wznowienie śluzy
+' Przypadki użycia: "Zatrzymać awaryjnie", "Wznowić po awarii"
+' Zatrzymanie może pochodzić od operatora (A) albo z kontroli reguł (B).
+
+skinparam shadowing false
+autonumber
+
+actor "Operator" as Operator
+participant "controller : SimulationController" as Controller
+participant "command : Command" as Command
+participant "simulation : Simulation" as Simulation
+participant "lock : Lock" as Lock
+participant "phase : LockPhase" as Phase
+participant "rules : SafetyRules" as Rules
+participant "listener : LockListener" as Listener
+
+== A. Zatrzymanie na żądanie operatora ==
+
+Operator -> Controller : processInput("halt")
+activate Controller
+Controller -> Command : execute(controller)
+note right of Command : EmergencyStopCommand\n(utworzone przez CommandFactory)
+activate Command
+Command -> Simulation : emergencyStop()
+activate Simulation
+Simulation -> Lock : halt("zatrzymanie awaryjne operatora", currentTick)
+activate Lock
+Lock -> Lock : phaseBeforeHalt = phase
+Lock -> Lock : phase = HALTED
+Lock -> Listener : onHalted(reason, currentTick)
+deactivate Lock
+deactivate Simulation
+Command --> Controller : komunikat
+deactivate Command
+deactivate Controller
+
+== B. Zatrzymanie po naruszeniu reguły bezpieczeństwa ==
+' Siatka asekuracyjna: normalnie nie powinno się zdarzyć,
+' ale chroni przed błędem w logice faz (np. złe poziomy w konfiguracji).
+
+Simulation -> Lock : advance(currentTick)
+activate Lock
+Lock -> Phase : update(lock, currentTick)
+Phase --> Lock : nextPhase = OPENING_ENTRY_GATE
+Lock -> Phase : nextPhase.onEnter(lock, currentTick)
+Phase -> Lock : openGate(getEntryGate())
+Lock -> Rules : canOpenGate(side, lock)
+activate Rules
+Rules --> Lock : false (poziom komory ≠ poziom bramy)
+deactivate Rules
+Lock -> Lock : throw SafetyViolationException("R2")
+Lock -> Lock : catch, then halt(exception.getRuleId(), currentTick)
+Lock -> Listener : onHalted(reason, currentTick)
+deactivate Lock
+
+== Wznowienie po awarii ==
+
+Operator -> Controller : processInput("resume")
+activate Controller
+Controller -> Command : execute(controller)
+note right of Command : ResumeCommand
+activate Command
+Command -> Simulation : resumeAfterEmergency()
+activate Simulation
+Simulation -> Lock : resume(currentTick)
+activate Lock
+Lock -> Rules : verify(lock)
+activate Rules
+
+alt stan śluzy spełnia wszystkie reguły
+    Rules --> Lock : (brak wyjątku)
+    Lock -> Lock : phase = phaseBeforeHalt
+    Lock -> Listener : onResumed(phase, currentTick)
+    Lock --> Simulation : true
+else reguły nadal naruszone
+    Rules --> Lock : SafetyViolationException
+    deactivate Rules
+    note right of Lock : śluza zostaje w HALTED
+    Lock --> Simulation : false
+end
+
+deactivate Lock
+Simulation --> Command : wynik
+deactivate Simulation
+Command --> Controller : komunikat (wznowiono / odmowa)
+deactivate Command
+deactivate Controller
+
+@enduml

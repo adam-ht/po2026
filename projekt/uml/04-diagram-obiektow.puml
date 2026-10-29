@@ -1,0 +1,131 @@
+@startuml
+title Diagram obiektów: migawka symulacji w takcie 42 (faza BOARDING, kierunek UP)
+
+skinparam shadowing false
+hide empty members
+
+' Sytuacja: statek towarowy #3 jest już w komorze, łódź pasażerska #7 właśnie
+' wpływa (został 1 takt), barka #8 czeka. Po stronie górnej czekają #5 i #6.
+' Brama dolna jest otwarta, górna zamknięta, woda na poziomie dolnym.
+' Statki #1, #2 i #4 przepłynęły we wcześniejszych cyklach.
+
+object "simulation : Simulation" as simulation {
+    currentTick = 42
+}
+
+object "lock : Lock" as lock {
+    phase = BOARDING
+    phaseBeforeHalt = null
+    direction = UP
+    boardingTicksLeft = 1
+    boardingWindowLeft = 4
+}
+
+object "lowerGate : Gate" as lowerGate {
+    side = LOWER
+    state = OPEN
+    ticksLeft = 0
+}
+
+object "upperGate : Gate" as upperGate {
+    side = UPPER
+    state = CLOSED
+    ticksLeft = 0
+}
+
+object "chamber : Chamber" as chamber {
+    waterLevel = 0.0
+    lowerLevel = 0.0
+    upperLevel = 4.0
+    levelRatePerTick = 0.5
+    capacity = 8
+}
+
+object "upQueue : ShipQueue" as upQueue {
+    direction = UP
+    agingStep = 10
+}
+
+object "downQueue : ShipQueue" as downQueue {
+    direction = DOWN
+    agingStep = 10
+}
+
+object "policy : AlternatingPolicy" as policy
+
+object "rules : SafetyRules" as rules
+
+object "statistics : Statistics" as statistics {
+    servedCount = 3
+    cycleCount = 3
+}
+
+object "shipFactory : ShipFactory" as shipFactory {
+    nextId = 9
+}
+
+object "generator : ArrivalGenerator" as generator {
+    arrivalProbability = 0.3
+}
+
+object "cargoShip3 : CargoShip" as cargoShip3 {
+    id = 3
+    direction = UP
+    arrivalTick = 30
+    boardedTick = 41
+    exitedTick = null
+}
+
+object "passengerBoat7 : PassengerBoat" as passengerBoat7 {
+    id = 7
+    direction = UP
+    arrivalTick = 39
+    boardedTick = null
+    exitedTick = null
+}
+
+object "barge8 : Barge" as barge8 {
+    id = 8
+    direction = UP
+    arrivalTick = 40
+    boardedTick = null
+    exitedTick = null
+}
+
+object "passengerBoat5 : PassengerBoat" as passengerBoat5 {
+    id = 5
+    direction = DOWN
+    arrivalTick = 34
+    boardedTick = null
+    exitedTick = null
+}
+
+object "cargoShip6 : CargoShip" as cargoShip6 {
+    id = 6
+    direction = DOWN
+    arrivalTick = 36
+    boardedTick = null
+    exitedTick = null
+}
+
+simulation *-- lock
+simulation *-- generator
+simulation *-- shipFactory
+simulation *-- statistics
+generator --> shipFactory
+lock *-- lowerGate
+lock *-- upperGate
+lock *-- chamber
+lock *-- upQueue
+lock *-- downQueue
+lock *-- rules
+lock --> policy
+lock o-- statistics : listeners
+
+chamber o-- cargoShip3 : occupants
+lock --> passengerBoat7 : shipBeingBoarded
+upQueue o-- barge8 : waitingShips
+downQueue o-- passengerBoat5 : waitingShips
+downQueue o-- cargoShip6 : waitingShips
+
+@enduml

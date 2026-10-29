@@ -1,0 +1,108 @@
+@startuml
+title Sekwencja: przepłynięcie statku w górę (kierunek UP) – pełny cykl śluzy
+' Przypadek użycia: "Przepłynąć przez śluzę"
+' Założenie: statek już czeka w kolejce (zob. 02-sekwencja-przybycie-statku.puml).
+' Każda faza trwa tyle taktów, ile potrzeba – tu pokazany jest jej początek i warunek końca.
+
+skinparam shadowing false
+autonumber
+
+participant "lock : Lock" as Lock
+participant "phase : LockPhase" as Phase
+participant "policy : DirectionPolicy" as Policy
+participant "upQueue : ShipQueue" as Queue
+participant "ship : Ship" as Ship
+participant "lowerGate : Gate" as EntryGate
+participant "chamber : Chamber" as Chamber
+participant "upperGate : Gate" as ExitGate
+participant "rules : SafetyRules" as Rules
+participant "listener : LockListener" as Listener
+
+== WAITING – wybór kierunku ==
+Lock -> Phase : WAITING.update(lock, currentTick)
+Phase -> Lock : chooseDirection(currentTick)
+Lock -> Policy : choose(upQueue, downQueue, lastDirection, currentTick)
+Policy --> Lock : Optional(UP)
+Lock --> Phase : true
+note over Phase : poziom komory ≠ poziom bramy dolnej, więc\nnastępna faza: LEVELING_TO_ENTRY\n(gdy równe – od razu OPENING_ENTRY_GATE)
+
+== LEVELING_TO_ENTRY – opuszczenie pustej komory ==
+loop dopóki komora nie zrówna się z poziomem dolnym
+    Lock -> Phase : update(lock, currentTick)
+    Phase -> Lock : levelStep(LOWER)
+    Lock -> Rules : canChangeLevel(lock)
+    Rules --> Lock : true (obie bramy CLOSED)
+    Lock -> Chamber : drainStep()
+end
+
+== OPENING_ENTRY_GATE ==
+Lock -> Phase : OPENING_ENTRY_GATE.onEnter(lock, currentTick)
+Phase -> Lock : openGate(getEntryGate())
+Lock -> Rules : canOpenGate(LOWER, lock)
+Rules --> Lock : true (poziom równy, druga brama CLOSED)
+Lock -> EntryGate : startOpening()
+loop gateTicks taktów
+    Lock -> EntryGate : advance()
+end
+EntryGate --> Lock : state == OPEN
+Lock -> Listener : onPhaseChanged(OPENING_ENTRY_GATE, BOARDING, currentTick)
+
+== BOARDING – wpuszczanie statków ==
+loop dopóki coś się mieści i nie minęło boardingWindow
+    Phase -> Lock : boardStep(currentTick)
+    Lock -> Chamber : getRemainingCapacity()
+    Chamber --> Lock : remainingCapacity
+    Lock -> Queue : pollBestFitting(remainingCapacity, currentTick)
+    Queue --> Lock : Optional(ship)
+    loop ship.getBoardingTicks() taktów
+        Lock -> Lock : boardingTicksLeft--
+    end
+    Lock -> Chamber : add(ship)
+    Lock -> Ship : markBoarded(currentTick)
+    Lock -> Listener : onShipBoarded(ship, currentTick)
+end
+note over Phase : koniec fazy: nic się już nie mieści\nlub minął boardingWindow (i komora niepusta)
+
+== CLOSING_ENTRY_GATE ==
+Lock -> EntryGate : startClosing()
+loop gateTicks taktów
+    Lock -> EntryGate : advance()
+end
+EntryGate --> Lock : state == CLOSED
+
+== LEVELING_TO_EXIT – napełnianie komory ze statkami ==
+loop dopóki komora nie zrówna się z poziomem górnym
+    Phase -> Lock : levelStep(UPPER)
+    Lock -> Rules : canChangeLevel(lock)
+    Rules --> Lock : true
+    Lock -> Chamber : fillStep()
+end
+
+== OPENING_EXIT_GATE ==
+Phase -> Lock : openGate(getExitGate())
+Lock -> Rules : canOpenGate(UPPER, lock)
+Rules --> Lock : true
+Lock -> ExitGate : startOpening()
+loop gateTicks taktów
+    Lock -> ExitGate : advance()
+end
+
+== UNBOARDING – opuszczanie komory ==
+loop dopóki komora niepusta
+    Phase -> Lock : unboardStep(currentTick)
+    Lock -> Chamber : removeNext()
+    Chamber --> Lock : ship
+    Lock -> Ship : markExited(currentTick)
+    Lock -> Listener : onShipExited(ship, currentTick)
+    note right of Listener : Statistics dolicza czas oczekiwania\n(ship.getWaitingTime())
+end
+
+== CLOSING_EXIT_GATE ==
+Lock -> ExitGate : startClosing()
+loop gateTicks taktów
+    Lock -> ExitGate : advance()
+end
+ExitGate --> Lock : state == CLOSED
+Lock -> Listener : onPhaseChanged(CLOSING_EXIT_GATE, WAITING, currentTick)
+
+@enduml
