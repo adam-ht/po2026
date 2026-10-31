@@ -132,6 +132,7 @@ package "model.lock" {
         +isClosed(): boolean
         +getSide(): GateSide
         +getState(): GateState
+        +getTicksLeft(): int
     }
 
     class Chamber {
@@ -145,6 +146,7 @@ package "model.lock" {
         +drainStep()
         +getLevelAt(side: GateSide): double
         +isLevelWith(side: GateSide): boolean
+        +getCapacity(): int
         +getRemainingCapacity(): int
         +getUsedCapacity(): int
         +add(ship: Ship)
