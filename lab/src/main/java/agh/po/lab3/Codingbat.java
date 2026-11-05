@@ -1,5 +1,8 @@
 package agh.po.lab3;
 
+import java.util.Map;
+import java.util.HashMap;
+
 public class Codingbat {
     public boolean loneTeen(int a, int b) {
         if(a >= 13 && a <= 19 && b>=13 && b <= 19 || a==b){
@@ -30,6 +33,30 @@ public class Codingbat {
         int size = str.length();
         return str.substring(0, size/2);
     }
+
+    public Map<String, String> mapAB(Map<String, String> map) {
+        if(map.containsKey("a") && map.containsKey("b")){
+            map.put("ab", map.get("a") + map.get("b"));
+        }
+
+        return map;
+    }
+
+    public Map<String, Integer> wordLen(String[] strings) {
+        Map<String, Integer> changedWordLen = new HashMap<>();
+
+        for (int i = 0; i < strings.length; i++) {
+            String s = strings[i];
+            changedWordLen.put(s, s.length());
+        }
+
+//        for (String s : strings) {
+//            changedWordLen.put(s, s.length());
+//        }
+
+        return changedWordLen;
+    }
+
 
     public void main(){
         Codingbat cb = new Codingbat();

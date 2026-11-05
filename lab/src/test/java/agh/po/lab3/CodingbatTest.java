@@ -2,6 +2,9 @@ package agh.po.lab3;
 
 import org.junit.Test;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.junit.Assert.assertEquals;
 
 public class CodingbatTest {
@@ -31,5 +34,24 @@ public class CodingbatTest {
         assertEquals("Woo", codingBat.firstHalf("WooHoo"));
         assertEquals("Hello", codingBat.firstHalf("HelloThere"));
         assertEquals("abc", codingBat.firstHalf("abcdef"));
+    }
+
+    @Test
+    public void wordLenTest() {
+        String[] input = {"a", "bb", "a", "bb"};
+        Map<String, Integer> correct = new HashMap<>();
+        correct.put("a", 1);
+        correct.put("bb", 2);
+
+        Map<String, Integer> world = new HashMap<>();
+        assertEquals(correct, codingBat.wordLen(input));
+    }
+
+    @Test
+    public void mapABTest() {
+        assertEquals("aabb", codingBat.mapAB(new HashMap<String, String>() {{
+            put("a", "aa");
+            put("b", "bb");
+        }}).get("ab"));
     }
 }
