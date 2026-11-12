@@ -11,9 +11,7 @@ public abstract class Animal {
         this.legs = legs;
     }
 
-    public String getDescription() {
-        return "Animal with name: " + name + " and " + legs + " legs";
-    }
+    public abstract String getDescription();
 
     public int getLegs() {
         return legs;

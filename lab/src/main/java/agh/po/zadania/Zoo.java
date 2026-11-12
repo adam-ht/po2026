@@ -1,4 +1,4 @@
-package agh.po.zadania.Zoo;
+package agh.po.zadania;
 
 import agh.po.animals.Animal;
 import agh.po.animals.Dog;
@@ -37,8 +37,8 @@ public class Zoo {
 
     public int getAnimalsLegs() {
         int legs = 0;
-        for(int i = 0; i < animals.length; i++){
-            legs += animals[i].getLegs();
+        for (Animal animal : animals) {
+            legs += animal.getLegs();
         }
         return legs;
     }
