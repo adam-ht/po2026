@@ -3,6 +3,8 @@ package agh.po.sluza.model.lock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ChamberTest {
@@ -10,7 +12,7 @@ public class ChamberTest {
 
     @BeforeEach
     void setUp() {
-        chamber = new Chamber(0, 4, 1);
+        chamber = new Chamber(0, 4, 1, 5);
     }
 
     @Test
@@ -69,13 +71,105 @@ public class ChamberTest {
 
     @Test
     void constructorRejectsUpperLevelNotAboveLowerLevel() {
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(10, 10, 1));
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(10, 5, 1));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(10, 10, 1, 5));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(10, 5, 1, 5));
     }
 
     @Test
     void constructorRejectsNonPositiveLevelRate() {
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(0, 5, 0));
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(0, 5, -5));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(0, 5, 0, 5));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(0, 5, -5, 5));
+    }
+
+    @Test
+    void newChamberIsEmptyWithFullCapacity() {
+        assertTrue(chamber.isEmpty());
+        assertEquals(0, chamber.getUsedCapacity());
+        assertEquals(5, chamber.getRemainingCapacity());
+    }
+
+    @Test
+    void addingShipsIncreasesUsedCapacity() {
+        chamber.add(new FakeShip(2, "Fake ship A"));
+        chamber.add(new FakeShip(2, "Fake ship B"));
+        assertFalse(chamber.isEmpty());
+        assertEquals(4, chamber.getUsedCapacity());
+        assertEquals(1, chamber.getRemainingCapacity());
+    }
+
+    @Test
+    void shipFillingRemainingSpaceExactlyIsAccepted() {
+        chamber.add(new FakeShip(2, "Fake ship A"));
+        chamber.add(new FakeShip(2, "Fake ship B"));
+        chamber.add(new FakeShip(1, "Fake ship C"));
+        assertEquals(5, chamber.getUsedCapacity());
+        assertEquals(0, chamber.getRemainingCapacity());
+    }
+
+    @Test
+    void addShipThrowsExceptionIfShipIsTooLong() {
+        assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(6, "Fake ship")));
+        assertEquals(5, chamber.getRemainingCapacity());
+        assertEquals(0, chamber.getUsedCapacity());
+    }
+
+    @Test
+    void addShipThrowsExceptionWhenNotEnoughSpace() {
+        chamber.add(new FakeShip(2, "Fake ship A"));
+        chamber.add(new FakeShip(2, "Fake ship B"));
+        assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(2, "Fake ship D")));
+        assertEquals(4, chamber.getUsedCapacity());
+    }
+
+    @Test
+    void removeNextReturnsInBoardingOrder() {
+        FakeShip shipA = new FakeShip(2, "Fake ship A");
+        FakeShip shipB = new FakeShip(2, "Fake ship B");
+        FakeShip shipC = new FakeShip(1, "Fake ship C");
+        chamber.add(shipA);
+        chamber.add(shipB);
+        chamber.add(shipC);
+        assertSame(shipA, chamber.removeNext());
+        assertSame(shipB, chamber.removeNext());
+        assertSame(shipC, chamber.removeNext());
+        assertTrue(chamber.isEmpty());
+    }
+
+    @Test
+    void removeNextFreesSpace() {
+        chamber.add(new FakeShip(2, "Fake ship A"));
+        chamber.add(new FakeShip(2, "Fake ship B"));
+        chamber.removeNext();
+        assertEquals(3, chamber.getRemainingCapacity());
+        assertEquals(2, chamber.getUsedCapacity());
+    }
+
+    @Test
+    void removeShipThrowsExceptionIfNoShipsInChamber() {
+        assertThrows(IllegalStateException.class, () -> chamber.removeNext());
+    }
+
+    @Test
+    void getOccupantDescriptionsReturnsListInAddOrder() {
+        chamber.add(new FakeShip(2, "Fake ship A"));
+        chamber.add(new FakeShip(2, "Fake ship B"));
+        chamber.add(new FakeShip(1, "Fake ship C"));
+        assertEquals(List.of("Fake ship A", "Fake ship B", "Fake ship C"), chamber.getOccupantDescriptions());
+    }
+
+    @Test
+    void modifyingReturnDoesntInterfereWithChamber() {
+        chamber.add(new FakeShip(2, "Fake ship A"));
+        chamber.add(new FakeShip(2, "Fake ship B"));
+        chamber.add(new FakeShip(1, "Fake ship C"));
+        chamber.getOccupantDescriptions().clear();
+        assertEquals(List.of("Fake ship A", "Fake ship B", "Fake ship C"), chamber.getOccupantDescriptions());
+        assertFalse(chamber.isEmpty());
+    }
+
+    @Test
+    void ConstructorRejectsCapacityLessThanOne() {
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(0,5,1,0));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(0,5,1,-1));
     }
 }
