@@ -2,8 +2,7 @@ package agh.po.sluza.model.lock;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 class GateTest {
 
@@ -69,5 +68,18 @@ class GateTest {
     void constructorRejectsNonPositiveGateTicks() {
         assertThrows(IllegalArgumentException.class, () -> new Gate(GateSide.LOWER, 0));
         assertThrows(IllegalArgumentException.class, () -> new Gate(GateSide.LOWER, -1));
+    }
+
+    @Test
+    void gateInMotionIsNeitherOpenNorClosed() {
+        Gate gate = new Gate(GateSide.LOWER, 2);
+        gate.startOpening();
+        assertFalse(gate.isOpen());
+        assertFalse(gate.isClosed());
+    }
+
+    @Test
+    void constructorThrowsExceptionOnNullSide() {
+        assertThrows(NullPointerException.class, ()-> new Gate(null, 5));
     }
 }

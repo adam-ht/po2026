@@ -1,5 +1,7 @@
 package agh.po.sluza.model.lock;
 
+import java.util.Objects;
+
 public class Gate {
 
     private final GateSide side;
@@ -11,7 +13,7 @@ public class Gate {
         if (gateTicks <= 0) {
             throw new IllegalArgumentException("Gate ticks must be positive");
         }
-        this.side = side;
+        this.side = Objects.requireNonNull(side, "Gate ticks must not be null");;
         this.gateTicks = gateTicks;
 
     }
@@ -54,5 +56,13 @@ public class Gate {
                 state = GateState.OPEN;
             }
         }
+    }
+
+    public boolean isClosed() {
+        return state == GateState.CLOSED;
+    }
+
+    public boolean isOpen() {
+        return state == GateState.OPEN;
     }
 }

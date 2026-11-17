@@ -185,6 +185,5 @@ public class ChamberTest {
         chamber.add(new FakeShip(2,15,"Fake ship A"));
         assertFalse(chamber.isEmpty());
         assertEquals(List.of("Fake ship A"), chamber.getOccupantDescriptions());
-        assertTrue();
     }
 }
