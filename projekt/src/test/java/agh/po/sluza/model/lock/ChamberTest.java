@@ -176,7 +176,15 @@ public class ChamberTest {
 
     @Test
     void addThrowsExceptionIfShipTooWide(){
-
         assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(2, 20, "Fake ship A")));
+        assertTrue(chamber.isEmpty());
+    }
+
+    @Test
+    void addAcceptsShipWithMaxChamberWidth(){
+        chamber.add(new FakeShip(2,15,"Fake ship A"));
+        assertFalse(chamber.isEmpty());
+        assertEquals(List.of("Fake ship A"), chamber.getOccupantDescriptions());
+        assertTrue();
     }
 }
