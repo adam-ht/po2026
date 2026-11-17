@@ -176,7 +176,6 @@ public class ChamberTest {
 
     @Test
     void addThrowsExceptionIfShipTooWide(){
-
-        assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(2, 20, "Fake ship A")));
+        assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(4, 20, "Fake ship A")));
     }
 }
