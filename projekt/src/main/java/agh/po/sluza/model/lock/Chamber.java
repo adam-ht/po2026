@@ -10,11 +10,13 @@ public class Chamber {
     private final double upperLevel;
     private final double levelRatePerTick;
     private final int capacity;
+    private final int width;
     private double waterLevel;
 
     private final List<Ship> occupants = new ArrayList<>(); // Lista statków znajdujących się w komorze
 
-    public Chamber(double lowerLevel, double upperLevel, double levelRatePerTick, int capacity) {
+    public Chamber(double lowerLevel, double upperLevel, double levelRatePerTick, int capacity, int width) {
+        this.width = width;
         if (levelRatePerTick <= 0) {
             throw new IllegalArgumentException("Level rate per tick must be positive");
         }
@@ -83,6 +85,9 @@ public class Chamber {
     public void add(Ship ship) {
         if(ship.getLength() > getRemainingCapacity()) {
             throw new IllegalStateException("Ship is too long for chamber");
+        }
+        if(ship.getWidth() > width) {
+            throw new IllegalStateException("Ship is too wide for chamber");
         }
         occupants.add(ship);
     }

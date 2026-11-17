@@ -12,7 +12,7 @@ public class ChamberTest {
 
     @BeforeEach
     void setUp() {
-        chamber = new Chamber(0, 4, 1, 5);
+        chamber = new Chamber(0, 4, 1, 5, 15);
     }
 
     @Test
@@ -71,16 +71,17 @@ public class ChamberTest {
 
     @Test
     void constructorRejectsUpperLevelNotAboveLowerLevel() {
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(10, 10, 1, 5));
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(10, 5, 1, 5));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(10, 10, 1, 5, 15));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(10, 5, 1, 5, 15));
     }
 
     @Test
     void constructorRejectsNonPositiveLevelRate() {
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(0, 5, 0, 5));
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(0, 5, -5, 5));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(0, 5, 0, 5, 15));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(0, 5, -5, 5, 15));
     }
 
+    // Tests for ships
     @Test
     void newChamberIsEmptyWithFullCapacity() {
         assertTrue(chamber.isEmpty());
@@ -90,8 +91,8 @@ public class ChamberTest {
 
     @Test
     void addingShipsIncreasesUsedCapacity() {
-        chamber.add(new FakeShip(2, "Fake ship A"));
-        chamber.add(new FakeShip(2, "Fake ship B"));
+        chamber.add(new FakeShip(2, 5, "Fake ship A"));
+        chamber.add(new FakeShip(2, 5, "Fake ship B"));
         assertFalse(chamber.isEmpty());
         assertEquals(4, chamber.getUsedCapacity());
         assertEquals(1, chamber.getRemainingCapacity());
@@ -99,33 +100,33 @@ public class ChamberTest {
 
     @Test
     void shipFillingRemainingSpaceExactlyIsAccepted() {
-        chamber.add(new FakeShip(2, "Fake ship A"));
-        chamber.add(new FakeShip(2, "Fake ship B"));
-        chamber.add(new FakeShip(1, "Fake ship C"));
+        chamber.add(new FakeShip(2, 5, "Fake ship A"));
+        chamber.add(new FakeShip(2, 5, "Fake ship B"));
+        chamber.add(new FakeShip(1, 5, "Fake ship C"));
         assertEquals(5, chamber.getUsedCapacity());
         assertEquals(0, chamber.getRemainingCapacity());
     }
 
     @Test
     void addShipThrowsExceptionIfShipIsTooLong() {
-        assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(6, "Fake ship")));
+        assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(6, 5, "Fake ship")));
         assertEquals(5, chamber.getRemainingCapacity());
         assertEquals(0, chamber.getUsedCapacity());
     }
 
     @Test
     void addShipThrowsExceptionWhenNotEnoughSpace() {
-        chamber.add(new FakeShip(2, "Fake ship A"));
-        chamber.add(new FakeShip(2, "Fake ship B"));
-        assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(2, "Fake ship D")));
+        chamber.add(new FakeShip(2, 5, "Fake ship A"));
+        chamber.add(new FakeShip(2, 5, "Fake ship B"));
+        assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(2, 5, "Fake ship D")));
         assertEquals(4, chamber.getUsedCapacity());
     }
 
     @Test
     void removeNextReturnsInBoardingOrder() {
-        FakeShip shipA = new FakeShip(2, "Fake ship A");
-        FakeShip shipB = new FakeShip(2, "Fake ship B");
-        FakeShip shipC = new FakeShip(1, "Fake ship C");
+        FakeShip shipA = new FakeShip(2, 5, "Fake ship A");
+        FakeShip shipB = new FakeShip(2, 5, "Fake ship B");
+        FakeShip shipC = new FakeShip(1, 5, "Fake ship C");
         chamber.add(shipA);
         chamber.add(shipB);
         chamber.add(shipC);
@@ -137,8 +138,8 @@ public class ChamberTest {
 
     @Test
     void removeNextFreesSpace() {
-        chamber.add(new FakeShip(2, "Fake ship A"));
-        chamber.add(new FakeShip(2, "Fake ship B"));
+        chamber.add(new FakeShip(2, 5, "Fake ship A"));
+        chamber.add(new FakeShip(2, 5, "Fake ship B"));
         chamber.removeNext();
         assertEquals(3, chamber.getRemainingCapacity());
         assertEquals(2, chamber.getUsedCapacity());
@@ -151,17 +152,17 @@ public class ChamberTest {
 
     @Test
     void getOccupantDescriptionsReturnsListInAddOrder() {
-        chamber.add(new FakeShip(2, "Fake ship A"));
-        chamber.add(new FakeShip(2, "Fake ship B"));
-        chamber.add(new FakeShip(1, "Fake ship C"));
+        chamber.add(new FakeShip(2, 5, "Fake ship A"));
+        chamber.add(new FakeShip(2, 5, "Fake ship B"));
+        chamber.add(new FakeShip(1, 5, "Fake ship C"));
         assertEquals(List.of("Fake ship A", "Fake ship B", "Fake ship C"), chamber.getOccupantDescriptions());
     }
 
     @Test
     void modifyingReturnDoesntInterfereWithChamber() {
-        chamber.add(new FakeShip(2, "Fake ship A"));
-        chamber.add(new FakeShip(2, "Fake ship B"));
-        chamber.add(new FakeShip(1, "Fake ship C"));
+        chamber.add(new FakeShip(2, 5, "Fake ship A"));
+        chamber.add(new FakeShip(2, 5, "Fake ship B"));
+        chamber.add(new FakeShip(1, 5, "Fake ship C"));
         chamber.getOccupantDescriptions().clear();
         assertEquals(List.of("Fake ship A", "Fake ship B", "Fake ship C"), chamber.getOccupantDescriptions());
         assertFalse(chamber.isEmpty());
@@ -169,7 +170,13 @@ public class ChamberTest {
 
     @Test
     void ConstructorRejectsCapacityLessThanOne() {
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(0,5,1,0));
-        assertThrows(IllegalArgumentException.class, () -> new Chamber(0,5,1,-1));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(0,5,1,0, 15));
+        assertThrows(IllegalArgumentException.class, () -> new Chamber(0,5,1,-1, 15));
+    }
+
+    @Test
+    void addThrowsExceptionIfShipTooWide(){
+
+        assertThrows(IllegalStateException.class, () -> chamber.add(new FakeShip(2, 20, "Fake ship A")));
     }
 }
