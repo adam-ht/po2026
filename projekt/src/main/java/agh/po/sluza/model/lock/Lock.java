@@ -46,4 +46,29 @@ public class Lock {
         this.currentDirection = Objects.requireNonNull(direction);
         this.phase = LockPhase.LEVELING_TO_ENTRY;
     }
+
+    private void advanceLevelingToEntry(){
+        if (chamber.isLevelWith(entryGate().getSide())) {
+            entryGate().startOpening();
+            phase = LockPhase.OPENING_ENTRY_GATE;
+        } else if (chamber.getLevelAt(entryGate().getSide()) > chamber.getWaterLevel()) {
+            chamber.fillStep();
+        } else {
+            chamber.drainStep();
+        }
+    }
+
+    private void advanceOpeningEntryGate(){
+
+    }
+
+
+    public void advance() {
+        switch (phase){
+            case WAITING -> {}
+            case LEVELING_TO_ENTRY -> advanceLevelingToEntry();
+            case OPENING_ENTRY_GATE -> advanceOpeningEntryGate();
+            default -> throw new IllegalStateException("Phase not implemented yet" + phase);
+        }
+    }
 }

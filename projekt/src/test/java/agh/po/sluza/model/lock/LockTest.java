@@ -59,4 +59,30 @@ public class LockTest {
         assertThrows(IllegalStateException.class, () -> lock.startCycle(Direction.DOWN));
     }
 
+    @Test
+    void alreadyLevelWaterStartsOpeningEntryGateImmediately() {
+        lock.startCycle(Direction.UP);   // woda 0.0, brama wejściowa dolna: poziom się zgadza
+
+        lock.advance();
+
+        assertEquals(LockPhase.OPENING_ENTRY_GATE, lock.getPhase());
+        assertEquals(GateState.OPENING, lowerGate.getState());
+    }
+
+    @Test
+    void levelingToUpperEntryTakesOneTickPerStep() {
+        lock.startCycle(Direction.DOWN); // woda 0.0, brama wejściowa górna na 4.0, krok 0.5 => 8 taktów
+
+        for (int tick = 0; tick < 7; tick++) {
+            lock.advance();
+        }
+        assertEquals(LockPhase.LEVELING_TO_ENTRY, lock.getPhase());
+        assertEquals(3.5, chamber.getWaterLevel(), 1e-9);
+
+        lock.advance();
+        lock.advance();
+        assertEquals(LockPhase.OPENING_ENTRY_GATE, lock.getPhase());
+        assertEquals(GateState.OPENING, upperGate.getState());
+    }
+
 }
