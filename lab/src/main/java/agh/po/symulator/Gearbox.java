@@ -13,18 +13,25 @@ public class Gearbox extends Component {
     }
 
     void shiftUp() {
-        if (currentGear < numberOfGears) {
+        if (currentGear < numberOfGears && clutch.isEngaged()) {
             currentGear++;
         }
     }
 
     void shiftDown(){
-        if (currentGear > 0) {
+        if (currentGear > 0 && clutch.isEngaged()) {
             currentGear--;
         }
+    }
+    void shiftNeutral() {
+        currentGear = 0;
     }
 
     public int getCurrentGear() {
         return currentGear;
+    }
+
+    public double getCurrentGearRatio() {
+        return (double) currentGear / numberOfGears;
     }
 }

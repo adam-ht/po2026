@@ -7,8 +7,8 @@ public class Position {
     double x;
     double y;
 
-    public Vector<Double> getPos() {
-        return new Vector<>(Arrays.asList(x,y));
+    public String getPos() {
+        return "(" + x + ", " + y + ")";
     }
 
     public void updatePos(double deltaX, double deltaY) {

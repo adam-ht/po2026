@@ -3,14 +3,22 @@ package agh.po.symulator;
 public class Car {
     Engine engine;
     Gearbox gearbox;
-    Clutch clutch;
-    Component component;
     Position position;
+    String maker;
+    String model;
+    String licensePlate;
+    int topSpeed;
 
-    public Car(String maker, String model, Engine engine, Gearbox gearbox){
+
+
+    public Car(String maker, String model, Engine engine, Gearbox gearbox, String licensePlate, int topSpeed){
         this.engine = engine;
         this.gearbox = gearbox;
         this.position = new Position();
+        this.topSpeed = topSpeed;
+        this.licensePlate = licensePlate;
+        this.maker = maker;
+        this.model = model;
     }
 
     public void turnOn(){
@@ -19,56 +27,35 @@ public class Car {
 
     public void turnOff(){
         engine.turnOff();
-    }
-
-    public void clutchIn(){
-        clutch.engage();
-    }
-
-    public void clutchOut(){
-        clutch.disengage();
-    }
-
-    public void shiftUp(){
-        if(clutch.isEngaged()) {
-            gearbox.shiftUp();
-        } else {
-            throw new RuntimeException("Clutch must be engaged to shift up");
-        }
-    }
-
-    public void shiftDown(){
-        if(clutch.isEngaged()) {
-            gearbox.shiftDown();
-        } else {
-            throw new RuntimeException("Clutch must be engaged to shift down");
-        }
+        gearbox.shiftNeutral();
     }
 
     public void printInfo(){
-        System.out.println(position.getPos());
-        System.out.print(component.getMaker() + " ");
-        System.out.println(component.getModel());
-        System.out.print(engine.getMaker() + " ");
-        System.out.println(engine.getModel());
-        System.out.print(gearbox.getMaker()+" ");
-        System.out.println(gearbox.getModel());
-        System.out.print(gearbox.getCurrentGear());
+        System.out.println("Is on: " + engine.isOn);
+        System.out.println("Maker: " + maker);
+        System.out.println("Model: " + model);
+        System.out.println("License Plate: " + licensePlate);
+        System.out.println("Current position: " + position.getPos());
+        System.out.println("Current gear: " + gearbox.getCurrentGear());
+        System.out.println("Clutch pressed: " + gearbox.clutch.isEngaged());
+        System.out.println("Engine RPM: " + engine.getCurrentRPM());
+
     }
 
     public static void main(String[] args){
-        Engine engine1 = new Engine("VW", "BXW", "BJT", 6000);
+        Engine engine1 = new Engine("", "", "BXW", 6000);
         Clutch clutch1 = new Clutch("", "");
         Gearbox gearbox1 = new Gearbox("ZF", "8HP", 8, clutch1);
 
 
-        Car car = new Car("Seat", "Ibiza", engine1, gearbox1);
-        car.position.getPos();
+        Car car = new Car("Seat", "Ibiza", engine1, gearbox1, "SWD07527", 200);
         car.position.updatePos(5.2 , 4.7);
-        car.position.getPos();
         car.turnOn();
-        car.engine.increaseRPM(1000);
+        car.engine.increaseRPM(2220);
         car.gearbox.shiftUp();
+        car.printInfo();
+
+        car.turnOff();
         car.printInfo();
     }
 }
